@@ -1,10 +1,14 @@
+#!/usr/bin/env python
+
+# Author: Andrea Stagi <stagi.andrea@gmail.com>
+# Description: a clock synchronized with ntp server with an alarm controlled via Android
+# Dependencies: nanpy, ntplib, bluetooth
+
 from nanpy import (Servo, Lcd, Arduino)
 from datetime import datetime
 import ntplib, time, threading
 
 lcd = Lcd([6, 7, 8, 9, 10, 11], [16, 2])
-servo = Servo(12)
-
 milltime = 0
 
 class StopThread(threading.Thread):
@@ -22,6 +26,14 @@ class StopThread(threading.Thread):
 
     def elaborate(self):
         pass
+
+class BluetoothThread (StopThread):
+
+    def __init__(self):
+        StopThread.__init__(self)
+
+    def elaborate(self):
+        time.sleep(1)
 
 class TimeThread (StopThread):
 
@@ -51,11 +63,12 @@ class TemperatureThread (StopThread):
                 return
             time.sleep(1)
 
-class UpdateThread (StopThread):
+class ShowTimeThread (StopThread):
 
     def __init__(self):
         StopThread.__init__(self)
         self.c = 1
+        self.servo = Servo(12)
 
     def elaborate(self):
         global milltime
@@ -63,7 +76,7 @@ class UpdateThread (StopThread):
             return
         lcd.printString((datetime.fromtimestamp(milltime)).strftime('%Y-%m-%d'), 0, 0)
         lcd.printString((datetime.fromtimestamp(milltime)).strftime('%H:%M'), 0, 1)
-        servo.write(90 + (30 * self.c))
+        self.servo.write(90 + (30 * self.c))
         self.c *= -1
         Arduino.delay(1000)
 
@@ -71,13 +84,16 @@ timeth = TimeThread()
 timeth.start()
 tempth = TemperatureThread()
 tempth.start()
-updtth = UpdateThread()
-updtth.start()
+showth = ShowTimeThread()
+showth.start()
+blueth = BluetoothThread()
+blueth.start()
 
 raw_input("Press any key to stop...")
 
 timeth.stopMe()
 tempth.stopMe()
-updtth.stopMe()
+showth.stopMe()
+blueth.stopMe()
 
 
