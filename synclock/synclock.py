@@ -8,6 +8,10 @@ from nanpy import (Servo, Lcd, Arduino)
 from datetime import datetime
 import ntplib, time, threading
 
+from bluetooth import *
+
+UUID = "00001101-0000-1000-8000-00805F9B34FB"
+
 lcd = Lcd([6, 7, 8, 9, 10, 11], [16, 2])
 milltime = 0
 
@@ -59,11 +63,45 @@ class ClockThread (StopThread):
 
     def elaborate(self):
         #waiting for connection
-        print self.ck.getAlarm()
+        server_sock=BluetoothSocket( RFCOMM )
+        server_sock.bind(("", 29))
+        server_sock.listen(400)
+
+        port = server_sock.getsockname()[1]
+
+
+        advertise_service( server_sock, "SampleServer",
+                           service_id = UUID,
+                           service_classes = [ UUID, SERIAL_PORT_CLASS ],
+                           profiles = [ SERIAL_PORT_PROFILE ] )
+
+        print "Waiting for connection on RFCOMM channel %d" % port
+
+        client_sock, client_info = server_sock.accept()
+        print "Accepted connection from ", client_info
+
         #send h m and on to device
+        print self.ck.getAlarm()
+
         #listen device
         #get h, m and on
-        self.ck.setAlarm(12, 15, True)
+
+        try:
+            while True:
+                data = client_sock.recv(3)
+                if len(data) == 0: break
+                print data
+                self.ck.setAlarm(12, 15, True)
+
+        except IOError:
+            pass
+
+        print "disconnected"
+
+        client_sock.close()
+        server_sock.close()
+        print "all done"
+
         time.sleep(1)
 
 class TimeThread (StopThread):
