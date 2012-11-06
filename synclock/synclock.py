@@ -4,7 +4,7 @@
 # Description: a clock synchronized with ntp server with an alarm controlled via Android
 # Dependencies: nanpy, ntplib, bluetooth
 
-from nanpy import (Servo, Lcd, Arduino)
+from nanpy import (Servo, Lcd, Arduino, Tone)
 from datetime import datetime
 import ntplib, time, threading
 
@@ -32,7 +32,7 @@ class Clock():
             timestored = f.read()
             (h, m, on) = timestored.split(":")
             f.close()
-            return (h, m, on)
+            return (int(h), int(m), int(on))
         except IOError:
             self.setAlarm(0, 0, False)
             return (0, 0, False)
@@ -44,6 +44,8 @@ class Clock():
             return True
         else:
             return False
+
+ck = Clock()
 
 class StopThread(threading.Thread):
 
@@ -65,10 +67,8 @@ class ClockThread (StopThread):
 
     def __init__(self):
         StopThread.__init__(self)
-        self.ck = Clock()
 
     def elaborate(self):
-        #waiting for connection
         server_sock=BluetoothSocket( RFCOMM )
         server_sock.bind(("", 29))
         server_sock.listen(400)
@@ -86,13 +86,13 @@ class ClockThread (StopThread):
         client_sock, client_info = server_sock.accept()
         print "Accepted connection from ", client_info
 
-        print self.ck.getAlarm()
+        print ck.getAlarm()
 
         try:
             while not self.stop:
                 data = client_sock.recv(3)
                 if len(data) == 0: break
-                self.ck.setAlarm(ord(data[0]), ord(data[1]), ord(data[2]))
+                ck.setAlarm(ord(data[0]), ord(data[1]), ord(data[2]))
         except IOError:
             pass
 
@@ -108,6 +108,7 @@ class TimeThread (StopThread):
 
     def __init__(self):
         StopThread.__init__(self)
+        self.play = False
 
     def elaborate(self):
         global milltime
@@ -116,7 +117,11 @@ class TimeThread (StopThread):
             milltime = int(response.tx_time)
             time_str = (datetime.fromtimestamp(milltime)).strftime('%H:%M')
             if ck.equal(time_str):
-                PlayAlarmThread().start()
+                if not self.play:
+                    PlayAlarmThread().start()
+                    self.play = True
+            else:
+                    self.play = False
         except ntplib.NTPException:
             pass
         time.sleep(1)
@@ -130,7 +135,7 @@ class PlayAlarmThread (StopThread):
         tone = Tone(4)
         for i in range(5):
             tone.play(Tone.NOTE_C4, 250)
-            Android.sleep(100)
+            time.sleep(0.1)
         self.stopMe()
 
 class TemperatureThread (StopThread):
@@ -162,7 +167,7 @@ class ShowTimeThread (StopThread):
         lcd.printString((datetime.fromtimestamp(milltime)).strftime('%H:%M'), 0, 1)
         self.servo.write(90 + (30 * self.c))
         self.c *= -1
-        Arduino.delay(1000)
+        time.sleep(1)
 
 timeth = TimeThread()
 timeth.start()
@@ -179,5 +184,3 @@ timeth.stopMe()
 tempth.stopMe()
 showth.stopMe()
 clckth.stopMe()
-
-
