@@ -90,9 +90,7 @@ class ClockThread (StopThread):
             while not self.stop:
                 data = client_sock.recv(3)
                 if len(data) == 0: break
-                print ord(data[0])
-                self.ck.setAlarm(12, 15, True)
-
+                self.ck.setAlarm(data[0], data[1], data[2])
         except IOError:
             pass
 
