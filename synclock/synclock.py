@@ -22,9 +22,6 @@ class Clock():
         self.getAlarm()
 
     def setAlarm(self, h, m, on=True):
-        self.h = h
-        self.m = m
-        self.on = on
         f = open(self.path, 'w')
         f.write("%d:%d:%d" % (h, m, on))
         f.close()
@@ -33,11 +30,20 @@ class Clock():
         try:
             f = open(self.path, 'r')
             timestored = f.read()
-            (self.h, self.m, self.on) = timestored.split(":")
+            (h, m, on) = timestored.split(":")
             f.close()
+            return (h, m, on)
         except IOError:
             self.setAlarm(0, 0, False)
-        return (self.h, self.m, self.on)
+            return (0, 0, False)
+
+    def equal(self, time_str):
+        (my_h, my_m) = time_str.split(":")
+        (h, m, on) = self.getAlarm()
+        if int(my_h) == h and int(my_m) == m:
+            return True
+        else:
+            return False
 
 class StopThread(threading.Thread):
 
@@ -70,7 +76,7 @@ class ClockThread (StopThread):
         port = server_sock.getsockname()[1]
 
 
-        advertise_service( server_sock, "SampleServer",
+        advertise_service( server_sock, "SynclockServer",
                            service_id = UUID,
                            service_classes = [ UUID, SERIAL_PORT_CLASS ],
                            profiles = [ SERIAL_PORT_PROFILE ] )
@@ -80,11 +86,7 @@ class ClockThread (StopThread):
         client_sock, client_info = server_sock.accept()
         print "Accepted connection from ", client_info
 
-        #send h m and on to device
         print self.ck.getAlarm()
-
-        #listen device
-        #get h, m and on
 
         try:
             while not self.stop:
@@ -112,9 +114,24 @@ class TimeThread (StopThread):
         try:
             response = ntplib.NTPClient().request('europe.pool.ntp.org', version=3)
             milltime = int(response.tx_time)
+            time_str = (datetime.fromtimestamp(milltime)).strftime('%H:%M')
+            if ck.equal(time_str):
+                PlayAlarmThread().start()
         except ntplib.NTPException:
             pass
         time.sleep(1)
+
+class PlayAlarmThread (StopThread):
+
+    def __init__(self):
+        StopThread.__init__(self)
+
+    def elaborate(self):
+        tone = Tone(4)
+        for i in range(5):
+            tone.play(Tone.NOTE_C4, 250)
+            Android.sleep(100)
+        self.stopMe()
 
 class TemperatureThread (StopThread):
 
