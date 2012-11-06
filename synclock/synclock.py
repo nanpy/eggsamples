@@ -47,127 +47,107 @@ class Clock():
 
 ck = Clock()
 
-class StopThread(threading.Thread):
+class ClockThread (threading.Thread):
 
     def __init__(self):
         threading.Thread.__init__(self)
-        self.stop = False
 
     def run(self):
-        while not self.stop:
-            self.elaborate()
+        while True:
+            srv_sock = BluetoothSocket( RFCOMM )
+            srv_sock.bind(("", 29))
+            srv_sock.listen(400)
+            port = srv_sock.getsockname()[1]
+            advertise_service(srv_sock, "SynclockServer", 
+            service_id = UUID,
+            service_classes = [ UUID, 	SERIAL_PORT_CLASS ],
+            profiles = [SERIAL_PORT_PROFILE])
 
-    def stopMe(self):
-        self.stop = True
+            cli_sock, cli_info = srv_sock.accept()
 
-    def elaborate(self):
-        pass
+            cli_sock.send("%d:%d:%d", ck.getAlarm())
 
-class ClockThread (StopThread):
+            try:
+                while True:
+                    data = cli_sock.recv(3)
+                    if len(data) == 0: break
+                    ck.setAlarm(ord(data[0]),
+                            ord(data[1]), 
+			                ord(data[2]))
+            except IOError:
+                pass
 
-    def __init__(self):
-        StopThread.__init__(self)
+            print "disconnected"
 
-    def elaborate(self):
-        server_sock=BluetoothSocket( RFCOMM )
-        server_sock.bind(("", 29))
-        server_sock.listen(400)
+            cli_sock.close()
+            srv_sock.close()
+            print "all done"
 
-        port = server_sock.getsockname()[1]
+            time.sleep(1)
 
-
-        advertise_service( server_sock, "SynclockServer",
-                           service_id = UUID,
-                           service_classes = [ UUID, SERIAL_PORT_CLASS ],
-                           profiles = [ SERIAL_PORT_PROFILE ] )
-
-        print "Waiting for connection on RFCOMM channel %d" % port
-
-        client_sock, client_info = server_sock.accept()
-        print "Accepted connection from ", client_info
-
-        print ck.getAlarm()
-
-        try:
-            while not self.stop:
-                data = client_sock.recv(3)
-                if len(data) == 0: break
-                ck.setAlarm(ord(data[0]), ord(data[1]), ord(data[2]))
-        except IOError:
-            pass
-
-        print "disconnected"
-
-        client_sock.close()
-        server_sock.close()
-        print "all done"
-
-        time.sleep(1)
-
-class TimeThread (StopThread):
+class TimeThread (threading.Thread):
 
     def __init__(self):
-        StopThread.__init__(self)
+        threading.Thread.__init__(self)
         self.play = False
 
-    def elaborate(self):
+    def run(self):
         global milltime
-        try:
-            response = ntplib.NTPClient().request('europe.pool.ntp.org', version=3)
-            milltime = int(response.tx_time)
-            time_str = (datetime.fromtimestamp(milltime)).strftime('%H:%M')
-            if ck.equal(time_str):
-                if not self.play:
-                    PlayAlarmThread().start()
-                    self.play = True
-            else:
+        while True:
+            try:
+                response = ntplib.NTPClient().request('europe.pool.ntp.org', version=3)
+                milltime = int(response.tx_time)
+                time_str = (datetime.fromtimestamp(milltime)).strftime('%H:%M')
+                if ck.equal(time_str):
+                    if not self.play:
+                        PlayAlarmThread().start()
+                        self.play = True
+                else:
                     self.play = False
-        except ntplib.NTPException:
-            pass
-        time.sleep(1)
+            except ntplib.NTPException:
+                pass
+            time.sleep(1)
 
-class PlayAlarmThread (StopThread):
+class PlayAlarmThread (threading.Thread):
 
     def __init__(self):
-        StopThread.__init__(self)
+        threading.Thread.__init__(self)
 
-    def elaborate(self):
+    def run(self):
         tone = Tone(4)
         for i in range(5):
             tone.play(Tone.NOTE_C4, 250)
             time.sleep(0.1)
-        self.stopMe()
 
-class TemperatureThread (StopThread):
-
-    def __init__(self):
-        StopThread.__init__(self)
-
-    def elaborate(self):
-        temp = ((Arduino.analogRead(0) / 1024.0) * 5.0 - 0.5) * 100
-        lcd.printString("- %0.1f\xDFC" % temp, 6, 1)
-
-        for i in range(60):
-            if self.stop:
-                return
-            time.sleep(1)
-
-class ShowTimeThread (StopThread):
+class TemperatureThread (threading.Thread):
 
     def __init__(self):
-        StopThread.__init__(self)
+        threading.Thread.__init__(self)
+
+    def run(self):
+        while True:
+            temp = ((Arduino.analogRead(0) / 1024.0) * 5.0 - 0.5) * 100
+            lcd.printString("- %0.1f\xDFC" % temp, 6, 1)
+            time.sleep(60)
+
+class ShowTimeThread (threading.Thread):
+
+    def __init__(self):
+        threading.Thread.__init__(self)
         self.c = 1
         self.servo = Servo(12)
 
-    def elaborate(self):
+    def run(self):
         global milltime
-        if milltime == 0:
-            return
-        lcd.printString((datetime.fromtimestamp(milltime)).strftime('%Y-%m-%d'), 0, 0)
-        lcd.printString((datetime.fromtimestamp(milltime)).strftime('%H:%M'), 0, 1)
-        self.servo.write(90 + (30 * self.c))
-        self.c *= -1
-        time.sleep(1)
+        while True:
+            if milltime == 0:
+                continue
+            dt = datetime.fromtimestamp(milltime)
+            lcd.printString(dt.strftime('%Y/%m/%d'), 0, 0)         
+            lcd.printString(dt.strftime('%H:%M'), 0, 1)
+            self.servo.write(90 + (30 * self.c))
+            self.c *= -1
+            time.sleep(1)
 
 timeth = TimeThread()
 timeth.start()
@@ -180,7 +160,9 @@ clckth.start()
 
 raw_input('Press any key to stop...')
 
-timeth.stopMe()
-tempth.stopMe()
-showth.stopMe()
-clckth.stopMe()
+timeth._Thread__stop()
+tempth._Thread__stop()
+showth._Thread__stop()
+clckth._Thread__stop()
+
+
