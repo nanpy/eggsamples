@@ -2,11 +2,12 @@
 
 # Author: Andrea Stagi <stagi.andrea@gmail.com>
 # Description: a clock synchronized with ntp server with an alarm controlled via Android
-# Dependencies: nanpy, ntplib, bluetooth
+# Dependencies: nanpy, ntplib, bluez
 
 from nanpy import (Servo, Lcd, Arduino, Tone)
 from datetime import datetime
-import ntplib, time, threading
+import ntplib, time 
+from threading import Thread, Lock
 
 from bluetooth import *
 
@@ -15,42 +16,53 @@ UUID = "00001101-0000-1000-8000-00805F9B34FB"
 lcd = Lcd([6, 7, 8, 9, 10, 11], [16, 2])
 milltime = 0
 
-class Clock():
+class AlarmClock():
     
     def __init__(self, path = 'synclockalarm'):
         self.path = path
+        self.access_file = Lock()
         self.getAlarm()
 
     def setAlarm(self, h, m, on=True):
-        f = open(self.path, 'w')
-        f.write("%d:%d:%d" % (h, m, on))
-        f.close()
+        try:
+            self.access_file.acquire()
+            f = open(self.path, 'w')
+            f.write("%d:%d:%d" % (h, m, on))
+            f.close()
+            self.access_file.release()
+        except IOError:
+            self.access_file.release()
 
     def getAlarm(self):
         try:
+            self.access_file.acquire()
             f = open(self.path, 'r')
             timestored = f.read()
             (h, m, on) = timestored.split(":")
             f.close()
+            self.access_file.release()
             return (int(h), int(m), int(on))
         except IOError:
+            self.access_file.release()
             self.setAlarm(0, 0, False)
             return (0, 0, False)
 
-    def equal(self, time_str):
+    def haveToPlay(self, time_str):
         (my_h, my_m) = time_str.split(":")
         (h, m, on) = self.getAlarm()
+        if on == False:
+            return False
         if int(my_h) == h and int(my_m) == m:
             return True
         else:
             return False
 
-ck = Clock()
+ck = AlarmClock()
 
-class ClockThread (threading.Thread):
+class AlarmClockThread (Thread):
 
     def __init__(self):
-        threading.Thread.__init__(self)
+        Thread.__init__(self)
 
     def run(self):
         while True:
@@ -65,7 +77,7 @@ class ClockThread (threading.Thread):
 
             cli_sock, cli_info = srv_sock.accept()
 
-            cli_sock.send("%d:%d:%d", ck.getAlarm())
+            cli_sock.send("%d:%d:%d" % ck.getAlarm())
 
             try:
                 while True:
@@ -85,10 +97,10 @@ class ClockThread (threading.Thread):
 
             time.sleep(1)
 
-class TimeThread (threading.Thread):
+class TimeThread (Thread):
 
     def __init__(self):
-        threading.Thread.__init__(self)
+        Thread.__init__(self)
         self.play = False
 
     def run(self):
@@ -98,7 +110,7 @@ class TimeThread (threading.Thread):
                 response = ntplib.NTPClient().request('europe.pool.ntp.org', version=3)
                 milltime = int(response.tx_time)
                 time_str = (datetime.fromtimestamp(milltime)).strftime('%H:%M')
-                if ck.equal(time_str):
+                if ck.haveToPlay(time_str):
                     if not self.play:
                         PlayAlarmThread().start()
                         self.play = True
@@ -108,10 +120,10 @@ class TimeThread (threading.Thread):
                 pass
             time.sleep(1)
 
-class PlayAlarmThread (threading.Thread):
+class PlayAlarmThread (Thread):
 
     def __init__(self):
-        threading.Thread.__init__(self)
+        Thread.__init__(self)
 
     def run(self):
         tone = Tone(4)
@@ -119,10 +131,10 @@ class PlayAlarmThread (threading.Thread):
             tone.play(Tone.NOTE_C4, 250)
             time.sleep(0.1)
 
-class TemperatureThread (threading.Thread):
+class TemperatureThread (Thread):
 
     def __init__(self):
-        threading.Thread.__init__(self)
+        Thread.__init__(self)
 
     def run(self):
         while True:
@@ -130,10 +142,10 @@ class TemperatureThread (threading.Thread):
             lcd.printString("- %0.1f\xDFC" % temp, 6, 1)
             time.sleep(60)
 
-class ShowTimeThread (threading.Thread):
+class ShowTimeThread (Thread):
 
     def __init__(self):
-        threading.Thread.__init__(self)
+        Thread.__init__(self)
         self.c = 1
         self.servo = Servo(12)
 
@@ -155,7 +167,7 @@ tempth = TemperatureThread()
 tempth.start()
 showth = ShowTimeThread()
 showth.start()
-clckth = ClockThread()
+clckth = AlarmClockThread()
 clckth.start()
 
 raw_input('Press any key to stop...')
@@ -164,5 +176,4 @@ timeth._Thread__stop()
 tempth._Thread__stop()
 showth._Thread__stop()
 clckth._Thread__stop()
-
 
