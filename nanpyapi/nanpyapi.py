@@ -1,4 +1,4 @@
-from flask import Flask, Blueprint, request
+from flask import Flask
 from arduino.arduino import arduino
 
 app = Flask(__name__)

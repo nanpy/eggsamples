@@ -1,4 +1,4 @@
-from flask import Flask, Blueprint, Response, request, json, jsonify
+from flask import Flask, Blueprint, Response, request, json
 from nanpy import Arduino
 
 arduino = Blueprint('arduino', __name__)
@@ -15,10 +15,7 @@ def digitalpin(pin_number):
     else:
         Arduino.pinMode(pin_number, Arduino.OUTPUT)
         Arduino.digitalWrite(pin_number, request.json['value'])
-        data = {
-            'status' : 1
-        }
-        resp = Response(json.dumps(data), status=200, mimetype='application/json')
+        resp = Response("", status=200, mimetype='application/json')
         return resp
 
 @arduino.route('/analogpin/<int:pin_number>', methods=['GET', 'POST'])
@@ -33,9 +30,6 @@ def analogpin(pin_number):
     else:
         Arduino.pinMode(pin_number, Arduino.OUTPUT)
         Arduino.analogWrite(pin_number, request.json['value'])
-        data = {
-            'status' : 1
-        }
-        resp = Response(json.dumps(data), status=200, mimetype='application/json')
+        resp = Response("", status=200, mimetype='application/json')
         return resp
 
