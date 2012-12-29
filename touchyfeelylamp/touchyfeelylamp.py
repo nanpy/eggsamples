@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # Author: Andrea Stagi <stagi.andrea@gmail.com>
-# Description:
+# Description: a lamp that turns a light on and off when you touch a piece of conductive material
 # Dependencies: nanpy
 
 from nanpy import (Arduino, CapacitiveSensor)
@@ -15,8 +15,7 @@ Arduino.pinMode(ledPin, Arduino.OUTPUT)
 while True:
     sensorValue = capSensor.capacitiveSensor(30)
      
-    print(sensorValue)
-
+    print("Capacitive sensor value: %d" % sensorValue)
 
     if sensorValue > threshold:
         Arduino.digitalWrite(ledPin, Arduino.HIGH)
