@@ -2,7 +2,7 @@
 
 # Author: Andrea Stagi <stagi.andrea@gmail.com>
 # Description: a lamp that turns a light on and off when you touch a piece of conductive material
-# Dependencies: nanpy
+# Dependencies: nanpy > 6.0
 
 from nanpy import (Arduino, CapacitiveSensor)
 
