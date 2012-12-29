@@ -8,7 +8,7 @@ You can find this project on the Arduino Projects Book, project #13
 Scheme
 ------
 
-![arduino](https://raw.github.com/nanpy/eggsamples/master/touchyfeelylamp/data/touchyfeelylamp_bb.png)
+![arduino](https://raw.github.com/nanpy/eggsamples/master/touchyfeelylamp/data/touchyfeelylamp_bb.jpg)
 
 Dependencies
 ------------
